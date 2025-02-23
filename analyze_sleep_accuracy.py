@@ -403,53 +403,127 @@ def smart_combined_detection(sleep_df, search_df, watch_df, chrome_df):
     return results_df, stats_dict
 
 def visualize_results(all_results_df):
-    """Create visualizations of the sleep detection results"""
+    """Create professional visualizations of the sleep detection results"""
     import matplotlib.pyplot as plt
     import seaborn as sns
     
-    # Set style - use default style instead of seaborn
-    plt.style.use('default')
+    # Set style and color palette
+    plt.style.use('seaborn')
+    colors = sns.color_palette("husl", n_colors=5)
     
-    # 1. Accuracy by source
-    plt.figure(figsize=(12, 6))
-    sns.boxplot(data=all_results_df, x='source', y='sleep_diff_minutes')
-    plt.title('Sleep Time Detection Accuracy by Source')
-    plt.ylabel('Difference in Minutes')
-    plt.xticks(rotation=45)
+    # Common figure settings
+    plt.rcParams['figure.figsize'] = (12, 8)
+    plt.rcParams['font.size'] = 10
+    plt.rcParams['axes.labelsize'] = 12
+    plt.rcParams['axes.titlesize'] = 14
+    plt.rcParams['xtick.labelsize'] = 10
+    plt.rcParams['ytick.labelsize'] = 10
+    
+    # 1. Error Distribution by Source
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 7))
+    
+    # Sleep time errors
+    sns.boxplot(data=all_results_df, x='source', y='sleep_diff_minutes', ax=ax1, palette=colors)
+    ax1.set_title('Sleep Time Detection Error by Source')
+    ax1.set_xlabel('Data Source')
+    ax1.set_ylabel('Error (minutes)')
+    ax1.tick_params(axis='x', rotation=45)
+    
+    # Wake time errors
+    sns.boxplot(data=all_results_df, x='source', y='wake_diff_minutes', ax=ax2, palette=colors)
+    ax2.set_title('Wake Time Detection Error by Source')
+    ax2.set_xlabel('Data Source')
+    ax2.set_ylabel('Error (minutes)')
+    ax2.tick_params(axis='x', rotation=45)
+    
     plt.tight_layout()
-    plt.savefig('sleep_accuracy_by_source.png')
+    plt.savefig('error_distribution.png', dpi=300, bbox_inches='tight')
     plt.close()
-
-    # 2. Time series of accuracy
-    plt.figure(figsize=(15, 6))
-    for source in all_results_df['source'].unique():
+    
+    # 2. Accuracy Over Time
+    plt.figure(figsize=(15, 8))
+    for idx, source in enumerate(all_results_df['source'].unique()):
         source_data = all_results_df[all_results_df['source'] == source]
-        plt.plot(source_data['date'], source_data['sleep_diff_minutes'], 
-                label=source, marker='o')
-    plt.title('Sleep Detection Accuracy Over Time')
+        plt.scatter(source_data['date'], source_data['sleep_diff_minutes'], 
+                   label=source, alpha=0.6, c=[colors[idx]], marker='o')
+        
+    plt.title('Sleep Time Detection Accuracy Trends')
     plt.xlabel('Date')
-    plt.ylabel('Difference in Minutes')
-    plt.legend()
-    plt.xticks(rotation=45)
+    plt.ylabel('Error (minutes)')
+    plt.legend(title='Data Source', bbox_to_anchor=(1.05, 1), loc='upper left')
+    plt.grid(True, alpha=0.3)
     plt.tight_layout()
-    plt.savefig('sleep_accuracy_timeline.png')
+    plt.savefig('accuracy_trends.png', dpi=300, bbox_inches='tight')
     plt.close()
-
-    # 3. Correlation between true and detected times
-    plt.figure(figsize=(12, 5))
-    plt.subplot(1, 2, 1)
-    sns.scatterplot(data=all_results_df, x='true_sleep', y='detected_sleep', 
-                    hue='source', alpha=0.6)
-    plt.title('True vs Detected Sleep Times')
-    plt.xticks(rotation=45)
     
-    plt.subplot(1, 2, 2)
-    sns.scatterplot(data=all_results_df, x='true_wake', y='detected_wake', 
-                    hue='source', alpha=0.6)
-    plt.title('True vs Detected Wake Times')
+    # 3. True vs Predicted Times
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 7))
+    
+    # Sleep times
+    for idx, source in enumerate(all_results_df['source'].unique()):
+        source_data = all_results_df[all_results_df['source'] == source]
+        ax1.scatter(source_data['true_sleep'].dt.hour + source_data['true_sleep'].dt.minute/60,
+                   source_data['detected_sleep'].dt.hour + source_data['detected_sleep'].dt.minute/60,
+                   label=source, alpha=0.6, c=[colors[idx]])
+    
+    ax1.plot([0, 24], [0, 24], 'k--', alpha=0.5)  # Perfect prediction line
+    ax1.set_title('True vs Detected Sleep Times')
+    ax1.set_xlabel('True Sleep Time (hour)')
+    ax1.set_ylabel('Detected Sleep Time (hour)')
+    ax1.legend(title='Data Source', bbox_to_anchor=(1.05, 1))
+    ax1.grid(True, alpha=0.3)
+    
+    # Wake times
+    for idx, source in enumerate(all_results_df['source'].unique()):
+        source_data = all_results_df[all_results_df['source'] == source]
+        ax2.scatter(source_data['true_wake'].dt.hour + source_data['true_wake'].dt.minute/60,
+                   source_data['detected_wake'].dt.hour + source_data['detected_wake'].dt.minute/60,
+                   label=source, alpha=0.6, c=[colors[idx]])
+    
+    ax2.plot([0, 24], [0, 24], 'k--', alpha=0.5)  # Perfect prediction line
+    ax2.set_title('True vs Detected Wake Times')
+    ax2.set_xlabel('True Wake Time (hour)')
+    ax2.set_ylabel('Detected Wake Time (hour)')
+    ax2.legend(title='Data Source', bbox_to_anchor=(1.05, 1))
+    ax2.grid(True, alpha=0.3)
+    
+    plt.tight_layout()
+    plt.savefig('prediction_accuracy.png', dpi=300, bbox_inches='tight')
+    plt.close()
+    
+    # 4. Detection Success Rate and Accuracy
+    plt.figure(figsize=(12, 6))
+    
+    # Prepare summary statistics
+    summary = all_results_df.groupby('source').agg({
+        'sleep_diff_minutes': ['mean', 'count'],
+        'wake_diff_minutes': 'mean'
+    }).reset_index()
+    summary.columns = ['source', 'sleep_error', 'detection_count', 'wake_error']
+    
+    # Create dual-axis plot
+    ax1 = plt.gca()
+    ax2 = ax1.twinx()
+    
+    # Plot bars for detection count
+    bars = ax1.bar(summary['source'], summary['detection_count'], alpha=0.3, color=colors)
+    ax1.set_xlabel('Data Source')
+    ax1.set_ylabel('Number of Successful Detections')
+    
+    # Plot lines for errors
+    line1 = ax2.plot(summary['source'], summary['sleep_error'], 'o-', label='Sleep Error', color=colors[0])
+    line2 = ax2.plot(summary['source'], summary['wake_error'], 'o-', label='Wake Error', color=colors[1])
+    ax2.set_ylabel('Mean Error (minutes)')
+    
+    # Combine legends
+    lines = line1 + line2
+    labels = [l.get_label() for l in lines]
+    ax2.legend(lines, labels, loc='upper right')
+    
+    plt.title('Detection Success Rate vs Accuracy')
     plt.xticks(rotation=45)
     plt.tight_layout()
-    plt.savefig('sleep_wake_correlation.png')
+    plt.savefig('detection_success.png', dpi=300, bbox_inches='tight')
     plt.close()
 
 def main():
