@@ -1,0 +1,198 @@
+Sleep Detection Analysis
+=======================
+
+Overview
+--------
+This study analyzed the effectiveness of using different digital activity sources (Search History, Watch History, and Chrome History) to detect sleep patterns. The analysis covered data from 2016 to 2025, with a total of 98,694 activity records.
+
+Data Distribution
+---------------
+- Most activity concentrated in recent years (2024-2025)
+- Significant increase in data volume from 2022 onwards
+- Chrome history provided 31,338 entries
+- Watch history provided the most data with 59,500 entries
+- Search history provided 7,856 entries
+
+Detection Rates
+--------------
+Detection rate indicates the percentage of days where the algorithm successfully identified
+both sleep and wake times from the available activity data. A higher rate means the source
+provided enough activity patterns to make predictions more often.
+
+For a day to have sufficient data for prediction, it needed to meet these criteria:
+- At least 2 activities in the 24-hour window
+- At least one gap between activities of 2+ hours
+- Gap occurs during typical sleep hours (sleep 8PM-4AM, wake 4AM-noon)
+- Gap is at least 3 hours long
+
+Days that didn't meet these criteria were considered to have insufficient data for
+prediction. This explains why even the Smart Combined approach could only make
+predictions for 50% of days - the remaining days likely had activity patterns
+that didn't match expected sleep behavior.
+
+Time Window Considerations
+------------------------
+The current algorithm uses relatively strict time windows:
+- Sleep time must be between 8PM and 4AM
+- Wake time must be between 4AM and noon
+
+These windows could be overly restrictive for:
+- Night owls who go to sleep after 4AM
+- Early birds who wake before 4AM
+- People with irregular sleep schedules
+- Shift workers
+
+Widening these windows would likely increase detection rates but might:
+1. Decrease accuracy by including more false positives
+2. Make it harder to distinguish between naps and primary sleep periods
+3. Reduce confidence in predictions due to increased ambiguity
+
+A potential improvement could be to dynamically adjust these windows based on:
+- Individual user patterns
+- Day of week (weekday vs weekend)
+- Historical sleep times from previous successful predictions
+
+1. Watch History: 43.8% (highest individual source)
+2. Search History: 34.4%
+3. Chrome History: 28.1%
+4. Smart Combined: 50.0% (best overall)
+5. Simple Combined: 28.1%
+
+The Smart Combined approach achieved the highest detection rate, suggesting that using multiple data sources improves coverage.
+This means it was able to make predictions for half of all days analyzed, while individual
+sources could only make predictions for 28-44% of days.
+
+Smart Combined Methodology
+------------------------
+The Smart Combined approach now uses separate weights for sleep and wake time predictions:
+
+Sleep time weights:
+- Search History: 0.5 (50%) - Heavily weighted due to best sleep accuracy (111.0 min error)
+- Watch History: 0.25 (25%) - Reduced weight due to worst sleep accuracy (197.8 min error)
+- Chrome History: 0.25 (25%) - Maintained for good time-of-day correlation (0.398)
+
+Wake time weights:
+- Search History: 0.2 (20%) - Reduced due to worst wake accuracy (745.8 min error)
+- Watch History: 0.4 (40%) - Increased due to best wake accuracy (648.3 min error)
+- Chrome History: 0.4 (40%) - Increased due to best within-30-min wake accuracy (11.1%)
+
+Performance Comparison
+--------------------
+Sleep Time Performance:
+- Old: Mean error 190.6 min, Within 30 min: 12.5%
+- New: Mean error 189.3 min, Within 30 min: 12.5%
+- Change: Slight improvement in mean error (~1.3 min better)
+
+Wake Time Performance:
+- Old: Mean error 642.6 min, Within 30 min: 6.2%
+- New: Mean error 641.0 min, Within 30 min: 6.2%
+- Change: Minor improvement in mean error (~1.6 min better)
+
+Other Metrics:
+- Detection rate remained at 50%
+- Sleep time correlation slightly decreased (0.139 → 0.137)
+- Wake time correlation slightly improved (-0.236 → -0.239)
+
+Analysis
+--------
+1. The separate weighting approach produced only marginal improvements:
+   - Sleep time accuracy improved by about 1.3 minutes
+   - Wake time accuracy improved by about 1.6 minutes
+   - Other metrics remained largely unchanged
+
+2. Possible explanations for limited improvement:
+   - The original weights might have been close to optimal
+   - The fundamental limitations might be in the detection method rather than the weighting
+   - The high variance in predictions might make precise weighting less impactful
+
+3. Areas for further investigation:
+   - Consider dynamic weights based on time of day
+   - Explore filtering outlier predictions before combining
+   - Investigate why wake time accuracy remains poor despite targeted weights
+   - Consider adding confidence scores to individual predictions
+
+The results suggest that while theoretically sound, separating sleep and wake weights
+provided only minimal improvements. This indicates that more substantial improvements
+might require changes to the underlying detection algorithm rather than just the
+weighting scheme.
+
+Sleep Time Accuracy
+------------------
+Mean Error (in minutes):
+- Search History: 111.0 (best)
+- Chrome History: 142.9
+- Smart Combined: 190.6
+- Watch History: 197.8
+
+Within 30 Minutes Accuracy:
+- Search History: 27.3% (best)
+- Combined: 22.2%
+- Watch History: 21.4%
+- Smart Combined: 12.5%
+- Chrome History: 11.1%
+
+Search History showed the best sleep time detection accuracy, suggesting it might better capture pre-sleep activity patterns.
+
+Wake Time Accuracy
+-----------------
+Mean Error (in minutes):
+- Smart Combined: 642.6 (best)
+- Watch History: 648.3
+- Chrome History: 671.4
+- Search History: 745.8
+
+Within 30 Minutes Accuracy:
+- Chrome History: 11.1% (best)
+- Smart Combined: 6.2%
+- Others: 0.0%
+
+Wake time detection was generally less accurate than sleep time detection across all sources.
+
+Time-of-Day Correlations
+-----------------------
+Sleep Time Correlations:
+- Chrome History: 0.398 (strongest)
+- Combined: 0.393
+- Smart Combined: 0.139
+- Watch History: 0.131
+- Search History: 0.091
+
+Wake Time Correlations:
+- All sources showed weak or negative correlations
+- Chrome History: -0.425
+- Watch History: -0.241
+- Smart Combined: -0.236
+
+Key Findings
+-----------
+1. Different sources show distinct strengths:
+   - Search History: Best for sleep time accuracy
+   - Watch History: Highest individual detection rate
+   - Chrome History: Best time-of-day correlations
+
+2. Smart Combined approach:
+   - Highest detection rate (50%)
+   - Moderate accuracy for both sleep and wake times
+   - Balances the strengths of different sources
+
+3. General observations:
+   - Sleep time detection is more accurate than wake time detection
+   - Morning activity patterns are less reliable for wake time detection
+   - Time-of-day correlations are generally weak, suggesting variable sleep patterns
+
+Limitations
+----------
+1. Wake time detection is particularly challenging across all sources
+2. High variance in accuracy (large standard deviations)
+3. Limited accuracy within 30-minute threshold
+4. Data distribution is heavily skewed toward recent years
+
+Recommendations
+--------------
+1. Further refinement of the Smart Combined algorithm could improve accuracy
+2. Consider different weighting schemes based on time of day
+3. Explore additional features for wake time detection
+4. Investigate the negative correlations in wake time detection
+5. Consider adding more data sources or activity types
+
+The results suggest that while digital activity can provide insights into sleep patterns, current methods are more reliable for detecting sleep onset than wake times. The Smart Combined approach shows promise but requires further refinement to improve accuracy while maintaining its superior detection rate. 
